@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import os
 from collections import Counter
 from math import sqrt
@@ -464,8 +465,7 @@ async def process_importance(importance_function, st_column, *args, **kwargs):
 
 def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
     # Convert input_ids and baseline to LongTensors
-    input_ids = input_ids.long()
-    baseline = baseline.long()
+    input_ids, baseline = input_ids.long(), baseline.long()
 
     # Initialize tensor to store accumulated gradients
     accumulated_grads = None
@@ -473,16 +473,18 @@ def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
     # Create interpolated inputs
     alphas = torch.linspace(0, 1, n_steps)
     delta = input_ids - baseline
-    interpolates = [(baseline + (alpha * delta).long()).long() for alpha in alphas]  # Explicitly cast to LongTensor
     
     # Initialize tqdm progress bar
     progress_increment = int(1 / n_steps * 100)
     progress = 0
-    for interpolate in interpolates:
-        
+    
+    for alpha in alphas:
         # Update tqdm progress bar
         progress += progress_increment
         progress_bar.progress(progress)
+
+        # In-place modification for memory efficiency
+        interpolate = baseline + (alpha * delta).long()
         
         # Convert interpolated samples to embeddings
         interpolate_embedding = model.transformer.wte(interpolate).clone().detach().requires_grad_(True)
@@ -491,20 +493,27 @@ def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
         output = model(inputs_embeds=interpolate_embedding, output_attentions=False)[0]
         
         # Aggregate the logits across all positions (using sum in this example)
-        aggregated_logit = output.sum() 
+        aggregated_logit = output.sum()
         
         # Backward pass to calculate gradients
         aggregated_logit.backward()
-
-        # Accumulate gradients
+        
+        # In-place addition to save memory
         if accumulated_grads is None:
             accumulated_grads = interpolate_embedding.grad.clone()
         else:
             accumulated_grads += interpolate_embedding.grad
-        
+
         # Clear gradients
         model.zero_grad()
         interpolate_embedding.grad.zero_()
+
+        # Explicitly free up memory
+        del interpolate
+        del interpolate_embedding
+        del output
+        del aggregated_logit
+        gc.collect()
 
     # Compute average gradients
     avg_grads = accumulated_grads / n_steps
