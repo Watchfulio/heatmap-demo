@@ -461,7 +461,11 @@ async def process_importance(importance_function, st_column, *args, **kwargs):
     )
 
     progress_bar_placeholder.empty()
-    return importance_map_df, importance_log_df
+
+    del importance_map
+    del importance_map_df
+    gc.collect()
+    return importance_log_df
 
 def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
     # Convert input_ids and baseline to LongTensors
@@ -566,14 +570,18 @@ st.set_page_config(layout="wide")
 
 @st.cache_resource  
 def load_model(model_version):
-    return GPT2LMHeadModel.from_pretrained(model_version, output_attentions=True) 
+    return GPT2LMHeadModel.from_pretrained(model_version, output_attentions=True)
+
+@st.cache_resource
+def load_tokenizer(tokenizer_name):
+    return tiktoken.get_encoding(tokenizer_name) 
 
 column_progress = {1: 0, 2: 0}
 model_type = 'gpt2'
 model_version = 'gpt2'
 model = load_model(model_version)
-gpt2tokenizer = tiktoken.get_encoding("gpt2")
-gpt3tokenizer = tiktoken.get_encoding("cl100k_base")
+gpt2tokenizer = load_tokenizer("gpt2")
+gpt3tokenizer = load_tokenizer("cl100k_base")
 
 
 st.title("A surprisingly effective way to estimate token importances in LLM prompts")
@@ -598,7 +606,7 @@ if st.button("Submit"):
         # Place heatmap in the first column
         with col1:
             st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
-            importance_map_df, importance_map_log_df = asyncio.run(
+            importance_map_log_df = asyncio.run(
                 process_importance(ablated_relative_importance, 1, user_input, gpt3tokenizer)
             )
             render_heatmap(user_input, importance_map_log_df)
