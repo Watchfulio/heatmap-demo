@@ -530,7 +530,7 @@ def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
     
     return attributions
 
-def process_integrated_gradients(input_text, gpt2tokenizer, model):
+def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
     # Reserve a placeholder for the progress bar
     progress_bar_placeholder = st.empty()
 
@@ -541,14 +541,11 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model):
     
     gpt2tokens = decoded_tokens(input_text, gpt2tokenizer)
 
-    with torch.no_grad():
-        outputs = model(inputs, output_attentions=True, output_hidden_states=True)
-
     # Initialize a baseline as zero tensor
     baseline = torch.zeros_like(inputs).long()
 
     # Compute Integrated Gradients targeting the aggregated sequence output
-    attributions = integrated_gradients(inputs, baseline, model, progress_bar)
+    attributions = integrated_gradients(inputs, baseline, model, progress_bar, n_steps)
 
     # Sum across the embedding dimensions to get a single attribution score per token
     attributions_sum = attributions.sum(axis=2).squeeze(0).detach().numpy()
@@ -596,7 +593,7 @@ user_input = st.text_area("Enter your prompt", "")
 
 # Submit button right below the text box
 if st.button("Submit"):
-    tab1, tab2 = st.tabs(["Individual", "Cross"])
+    tab1, tab2 = st.tabs(["Individual Analysis", "Comparative Analysis"])
     df1 = []
     df2 = []
     with tab1:
@@ -616,7 +613,7 @@ if st.button("Submit"):
         # Place heatmap in the second column
         with col2:
             st.header("Importance 'Ground Truth' (GPT-2 Integrated Gradients)")
-            attribution_df = process_integrated_gradients(user_input, gpt2tokenizer, model)
+            attribution_df = process_integrated_gradients(user_input, gpt2tokenizer, model, n_steps=100)
             render_heatmap(user_input, attribution_df)
             analyze_heatmap(attribution_df)
             df2 = attribution_df
