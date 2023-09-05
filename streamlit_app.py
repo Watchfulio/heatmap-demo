@@ -553,11 +553,14 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model):
     })
     return attribution_df
 
+@st.cache_resource  
+def load_model(model_version):
+    return GPT2LMHeadModel.from_pretrained(model_version, output_attentions=True) 
 
 column_progress = {1: 0, 2: 0}
 model_type = 'gpt2'
 model_version = 'gpt2'
-model = GPT2LMHeadModel.from_pretrained(model_version, output_attentions=True)
+model = load_model(model_version)
 gpt2tokenizer = tiktoken.get_encoding("gpt2")
 gpt3tokenizer = tiktoken.get_encoding("cl100k_base")
 
