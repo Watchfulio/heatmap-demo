@@ -14,8 +14,10 @@ import streamlit as st
 import tiktoken
 import spacy_alignments as tokenizations
 import torch
+import plotly.express as px
+import plotly.graph_objects as go
 from sklearn.metrics.pairwise import cosine_similarity
-from scipy.stats import pearsonr, kendalltau
+from scipy.stats import pearsonr, kendalltau, gaussian_kde
 from scipy.spatial.distance import euclidean
 from tenacity import retry
 from transformers import GPT2LMHeadModel
@@ -135,76 +137,97 @@ def align_dataframes(b2a, df1, a2b, df2):
 
     return aligned_df1, aligned_df2
 
-def analyze_heatmap(df):
-    sns.set_palette(sns.color_palette("viridis"))
-    df_copy = df.copy()
+def analyze_heatmap(df_input):
+    df = df_input.copy()
 
-    if "token" not in df_copy.columns or "importance_value" not in df_copy.columns:
-        raise ValueError(
-            "The DataFrame must contain 'token' and 'importance_value' columns."
-        )
+    if "token" not in df.columns or "importance_value" not in df.columns:
+        raise ValueError("The DataFrame must contain 'token' and 'importance_value' columns.")
 
-    df_copy["Position"] = range(len(df_copy))
+    df["Position"] = range(len(df))
 
     st.write("## Distribution of Importance Scores")
-    fig, ax = plt.subplots(figsize=(10, 4))
-    sns.histplot(df_copy["importance_value"], bins=20, kde=True, ax=ax)
-    ax.set_title("Distribution of Importance Scores")
-    st.pyplot(fig)
-
-    st.write("## Importance Heatmap")
-    fig, ax = plt.subplots(figsize=(len(df_copy) * 0.3, 4))
-    sns.heatmap(
-        df_copy[["importance_value"]].T,
-        cmap="viridis",
-        cbar_kws={"label": "Importance"},
-        ax=ax,
-    )
-    ax.set_xticks(range(len(df_copy)))
-    ax.set_xticklabels(df_copy["token"], rotation=45, ha="right")
-    ax.set_title("Importance Heatmap")
-    st.pyplot(fig)
-
+    # Calculate histogram data
+    hist, bin_edges = np.histogram(df['importance_value'], bins=20)
+    # Get the viridis colormap
+    viridis = plt.cm.get_cmap('viridis', len(bin_edges) - 1)
+    # Initialize the figure
+    fig = go.Figure()
+    # Create the histogram bars with viridis coloring
+    for i, freq in enumerate(hist):
+        color = f'rgb({int(viridis(i / (len(bin_edges) - 1))[0] * 255)}, {int(viridis(i / (len(bin_edges) - 1))[1] * 255)}, {int(viridis(i / (len(bin_edges) - 1))[2] * 255)})'
+        fig.add_trace(go.Bar(
+            x=[(bin_edges[i] + bin_edges[i+1]) / 2],
+            y=[freq],
+            width=np.diff(bin_edges)[i],
+            marker=dict(color=color)
+        ))
+    # Calculate and add the KDE line
+    x_kde = np.linspace(min(df["importance_value"]), max(df["importance_value"]), 500)
+    kde = gaussian_kde(df["importance_value"])
+    y_kde = kde(x_kde) * sum(hist) * (bin_edges[1] - bin_edges[0])
+    fig.add_trace(go.Scatter(x=x_kde, y=y_kde, mode='lines', line_shape='spline', line=dict(color='red')))
+    # Additional styling
+    fig.update_layout(title="Distribution of Importance Scores",
+                    xaxis_title="Importance Value",
+                    yaxis_title="Frequency",
+                    showlegend=False)
+    st.plotly_chart(fig, use_container_width=True)
+    
     st.write("## Importance Score per Token")
-    fig, ax = plt.subplots(figsize=(len(df_copy) * 0.3, 4))
-    sns.barplot(x="token", y="importance_value", data=df_copy, ax=ax)
-    # Rotate the existing x-axis labels
-    for label in ax.get_xticklabels():
-        label.set_rotation(45)
-        label.set_horizontalalignment("right")
-    ax.set_title("Importance Score per Token")
-    st.pyplot(fig)
+    # Normalize the importance values
+    min_val = df['importance_value'].min()
+    max_val = df['importance_value'].max()
+    normalized_values = (df['importance_value'] - min_val) / (max_val - min_val)
+    # Initialize the figure
+    fig = go.Figure()
+    # Create the bars, colored based on normalized importance_value
+    for i, (token, norm_value) in enumerate(zip(df['token'], normalized_values)):
+        color = f'rgb({int(viridis(norm_value)[0] * 255)}, {int(viridis(norm_value)[1] * 255)}, {int(viridis(norm_value)[2] * 255)})'
+        fig.add_trace(go.Bar(
+            x=[i],  # Use index for x-axis
+            y=[df['importance_value'].iloc[i]],
+            width=1.0,  # Set the width to make bars touch each other
+            marker=dict(color=color)
+        ))
+    # Additional styling
+    fig.update_layout(
+        title="Importance Score per Token",
+        xaxis_title="Token",
+        yaxis_title="Importance Value",
+        showlegend=False,
+        bargap=0,  # Remove gap between bars
+        xaxis=dict(  # Set tick labels to tokens
+            tickmode='array',
+            tickvals=list(range(len(df['token']))),
+            ticktext=list(df['token'])
+        )
+    )
+    # Rotate x-axis labels by 45 degrees
+    fig.update_xaxes(tickangle=45) 
+    st.plotly_chart(fig, use_container_width=True)
 
     st.write("## Top 10 Most Important Words")
-    top_10_important = df_copy.nlargest(10, "importance_value")
+    top_10_important = df.nlargest(10, "importance_value")
     st.write(top_10_important[["token", "importance_value"]])
 
     st.write("## Top 10 Least Important Words")
-    top_10_least_important = df_copy.nsmallest(10, "importance_value")
+    top_10_least_important = df.nsmallest(10, "importance_value")
     st.write(top_10_least_important[["token", "importance_value"]])
 
-    correlation, p_value = scipy.stats.pearsonr(
-        df_copy["importance_value"], df_copy["Position"]
-    )
-    st.write(
-        f"## Correlation between importance and position in text: {correlation:.2f}"
-    )
+    correlation, p_value = scipy.stats.pearsonr(df["importance_value"], df["Position"])
+    st.write(f"## Correlation between importance and position in text: {correlation:.2f}")
     st.write(f"P-value: {p_value:.2f}")
 
     st.write("## Correlation Plot")
-    fig, ax = plt.subplots(figsize=(10, 4))
-    sns.regplot(x="Position", y="importance_value", data=df_copy, ax=ax, lowess=True)
-    ax.set_title("Correlation between Importance and Position in Text")
-    ax.set_xlabel("Position in Text")
-    ax.set_ylabel("Importance")
-    st.pyplot(fig)
+    fig = px.scatter(df, x="Position", y="importance_value", trendline="lowess", title="Correlation between Importance and Position in Text")
+    st.plotly_chart(fig, use_container_width=True)
 
 def compare_heatmaps(df1, df2):
     # Ensure the DataFrames have the required columns
     if 'token' not in df1.columns or 'importance_value' not in df1.columns or \
        'token' not in df2.columns or 'importance_value' not in df2.columns:
         raise ValueError("Both DataFrames must contain 'token' and 'importance_value' columns.")
-        
+
     # Replace None with ""
     df1['token'].fillna("", inplace=True)
     df2['token'].fillna("", inplace=True)
@@ -216,7 +239,7 @@ def compare_heatmaps(df1, df2):
     # Check length of both DataFrames
     if len(importance_scores1) != len(importance_scores2):
         raise ValueError("Both DataFrames must have the same length.")
-        
+
     n = len(importance_scores1)  # Number of dimensions (tokens)
 
     # Calculating Pearson correlation coefficient
@@ -227,7 +250,7 @@ def compare_heatmaps(df1, df2):
 
     # Calculating Euclidean distance
     euclid_distance = euclidean(importance_scores1, importance_scores2)
-    
+
     # Calculating Normalized Euclidean distance
     normalized_euclid_distance = euclid_distance / np.sqrt(n)
 
@@ -241,26 +264,23 @@ def compare_heatmaps(df1, df2):
         'Euclidean Distance': normalized_euclid_distance,
         "Kendall's Tau": tau,
     }
-    
-    # Plotting the importance-by-token across the two heatmaps
-    fig, axes = plt.subplots(1, 2, figsize=(15, 5))
-    
-    axes[0].bar(df1['token'], importance_scores1, color='b', alpha=0.5, label='DF1')
-    axes[0].set_title("Importance by Token for DataFrame 1")
-    axes[0].set_xlabel("Tokens")
-    axes[0].set_ylabel("Importance Value")
-    axes[0].tick_params(axis='x', rotation=45)
-    
-    axes[1].bar(df2['token'], importance_scores2, color='r', alpha=0.5, label='DF2')
-    axes[1].set_title("Importance by Token for DataFrame 2")
-    axes[1].set_xlabel("Tokens")
-    axes[1].set_ylabel("Importance Value")
-    axes[1].tick_params(axis='x', rotation=45)
-    
-    plt.tight_layout()
-    st.pyplot(fig)  # Display the plot in Streamlit
-    
-    st.write("Comparison Metrics:", results)
+
+    col1, col2 = st.columns([0.5, 0.5])
+    with col1:
+        # Plotting the importance-by-token for DataFrame 1
+        st.write("## Importance by Token for GPT3 Estimation")
+        fig1 = px.bar(df1, x='token', y='importance_value', title='Importance by Token', color_discrete_sequence=['blue'])
+        st.plotly_chart(fig1)
+
+    with col2:
+        # Plotting the importance-by-token for DataFrame 2
+        st.write("## Importance by Token for GPT2 Integrated Gradients")
+        fig2 = px.bar(df2, x='token', y='importance_value', title='Importance by Token', color_discrete_sequence=['red'])
+        st.plotly_chart(fig2)
+
+    # Display the comparison metrics
+    st.write("## Comparison Metrics")
+    st.json(results)
     return results
 
 def decoded_tokens(string, tokenizer):
@@ -324,7 +344,7 @@ def normalize_vector(v):
         return v
     return v / norm
 
-
+@retry
 async def get_embedding(input_text, model=None, tokenizer=None):
     if not model:
         resp = await openai.Embedding.acreate(
@@ -591,40 +611,48 @@ st.empty()
 # Text box for prompt
 user_input = st.text_area("Enter your prompt", "")
 
+ig = st.toggle("Run GPT-2 Integrated Gradients (consumes a lot of memory)")
+
 # Submit button right below the text box
 if st.button("Submit"):
-    tab1, tab2 = st.tabs(["Individual Analysis", "Comparative Analysis"])
-    df1 = []
-    df2 = []
-    with tab1:
-        # Create two columns for heatmaps
-        col1, col2 = st.columns(2)
+    if ig:
+        tab1, tab2 = st.tabs(["Individual Analysis", "Comparative Analysis"])
+        df1 = []
+        df2 = []
+        with tab1:
+            # Create two columns for heatmaps
+            col1, col2 = st.columns(2)
 
-        # Place heatmap in the first column
-        with col1:
-            st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
-            importance_map_log_df = asyncio.run(
-                process_importance(ablated_relative_importance, 1, user_input, gpt3tokenizer)
-            )
-            render_heatmap(user_input, importance_map_log_df)
-            analyze_heatmap(importance_map_log_df)
-            df1 = importance_map_log_df
+            # Place heatmap in the first column
+            with col1:
+                st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
+                importance_map_log_df = asyncio.run(
+                    process_importance(ablated_relative_importance, 1, user_input, gpt3tokenizer)
+                )
+                render_heatmap(user_input, importance_map_log_df)
+                analyze_heatmap(importance_map_log_df)
+                df1 = importance_map_log_df
 
-        # Place heatmap in the second column
-        with col2:
-            st.header("Importance 'Ground Truth' (GPT-2 Integrated Gradients)")
-            attribution_df = process_integrated_gradients(user_input, gpt2tokenizer, model, n_steps=100)
-            render_heatmap(user_input, attribution_df)
-            analyze_heatmap(attribution_df)
-            df2 = attribution_df
+            # Place heatmap in the second column
+            with col2:
+                st.header("Importance 'Ground Truth' (GPT-2 Integrated Gradients)")
+                attribution_df = process_integrated_gradients(user_input, gpt2tokenizer, model, n_steps=100)
+                render_heatmap(user_input, attribution_df)
+                analyze_heatmap(attribution_df)
+                df2 = attribution_df
 
-    with tab2:
-        with st.spinner('Computing, please wait...'):
-            a2b, b2a = tokenizations.get_alignments(df1['token'].values.tolist(), df2['token'].values.tolist())
-            aligned_df1, aligned_df2 = align_dataframes(b2a, df1, a2b, df2)
-            compare_heatmaps(aligned_df1, aligned_df2)
-
-
+        with tab2:
+            with st.spinner('Computing, please wait...'):
+                a2b, b2a = tokenizations.get_alignments(df1['token'].values.tolist(), df2['token'].values.tolist())
+                aligned_df1, aligned_df2 = align_dataframes(b2a, df1, a2b, df2)
+                compare_heatmaps(aligned_df1, aligned_df2)
+    if not ig:
+        st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
+        importance_map_log_df = asyncio.run(
+            process_importance(ablated_relative_importance, 1, user_input, gpt3tokenizer)
+        )
+        render_heatmap(user_input, importance_map_log_df)
+        analyze_heatmap(importance_map_log_df)
 
 # Create empty spaces for vertical centering
 st.empty()
