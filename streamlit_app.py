@@ -85,11 +85,11 @@ def align_dataframes(b2a, df1, a2b, df2):
     aligned_vals1 = []
     aligned_strs2 = []
     aligned_vals2 = []
-    
+
     # Keep track of seen indices to avoid duplication
     seen_indices1 = set()
     seen_indices2 = set()
-    
+
     # Align df1 to df2
     for x in b2a:
         aligned_str1 = ""
@@ -98,15 +98,15 @@ def align_dataframes(b2a, df1, a2b, df2):
         for y in x:
             if y not in seen_indices1:
                 entry = df1.iloc[y]
-                aligned_str1 += entry['token']
-                aligned_sum1 += entry['importance_value']
+                aligned_str1 += entry["token"]
+                aligned_sum1 += entry["importance_value"]
                 aligned_ct1 += 1
                 seen_indices1.add(y)
-        
+
         if aligned_ct1 > 0:
             aligned_strs1.append(aligned_str1)
             aligned_vals1.append(aligned_sum1 / aligned_ct1)
-            
+
     # Align df2 to df1
     for x in a2b:
         aligned_str2 = ""
@@ -115,81 +115,112 @@ def align_dataframes(b2a, df1, a2b, df2):
         for y in x:
             if y not in seen_indices2:
                 entry = df2.iloc[y]
-                aligned_str2 += entry['token']
-                aligned_sum2 += entry['importance_value']
+                aligned_str2 += entry["token"]
+                aligned_sum2 += entry["importance_value"]
                 aligned_ct2 += 1
                 seen_indices2.add(y)
-        
+
         if aligned_ct2 > 0:
             aligned_strs2.append(aligned_str2)
             aligned_vals2.append(aligned_sum2 / aligned_ct2)
-    
+
     # Create aligned dataframes
-    aligned_df1 = pd.DataFrame({'token': aligned_strs1, 'importance_value': aligned_vals1})
-    aligned_df2 = pd.DataFrame({'token': aligned_strs2, 'importance_value': aligned_vals2})
-    
+    aligned_df1 = pd.DataFrame(
+        {"token": aligned_strs1, "importance_value": aligned_vals1}
+    )
+    aligned_df2 = pd.DataFrame(
+        {"token": aligned_strs2, "importance_value": aligned_vals2}
+    )
+
     # Ensure both dataframes have identical rows and columns
     if len(aligned_df1) < len(aligned_df2):
         padding = len(aligned_df2) - len(aligned_df1)
-        aligned_df1 = pd.concat([aligned_df1, pd.DataFrame({'token': [None]*padding, 'importance_value': [0.0]*padding})]).reset_index(drop=True)
+        aligned_df1 = pd.concat(
+            [
+                aligned_df1,
+                pd.DataFrame(
+                    {"token": [None] * padding, "importance_value": [0.0] * padding}
+                ),
+            ]
+        ).reset_index(drop=True)
     elif len(aligned_df1) > len(aligned_df2):
         padding = len(aligned_df1) - len(aligned_df2)
-        aligned_df2 = pd.concat([aligned_df2, pd.DataFrame({'token': [None]*padding, 'importance_value': [0.0]*padding})]).reset_index(drop=True)
+        aligned_df2 = pd.concat(
+            [
+                aligned_df2,
+                pd.DataFrame(
+                    {"token": [None] * padding, "importance_value": [0.0] * padding}
+                ),
+            ]
+        ).reset_index(drop=True)
 
     return aligned_df1, aligned_df2
+
 
 def analyze_heatmap(df_input):
     df = df_input.copy()
 
     if "token" not in df.columns or "importance_value" not in df.columns:
-        raise ValueError("The DataFrame must contain 'token' and 'importance_value' columns.")
+        raise ValueError(
+            "The DataFrame must contain 'token' and 'importance_value' columns."
+        )
 
     df["Position"] = range(len(df))
 
     st.write("## Distribution of Importance Scores")
     # Calculate histogram data
-    hist, bin_edges = np.histogram(df['importance_value'], bins=20)
+    hist, bin_edges = np.histogram(df["importance_value"], bins=20)
     # Get the viridis colormap
     viridis = matplotlib.colormaps['viridis']
     # Initialize the figure
     fig = go.Figure()
     # Create the histogram bars with viridis coloring
     for i, freq in enumerate(hist):
-        color = f'rgb({int(viridis(i / (len(bin_edges) - 1))[0] * 255)}, {int(viridis(i / (len(bin_edges) - 1))[1] * 255)}, {int(viridis(i / (len(bin_edges) - 1))[2] * 255)})'
-        fig.add_trace(go.Bar(
-            x=[(bin_edges[i] + bin_edges[i+1]) / 2],
-            y=[freq],
-            width=np.diff(bin_edges)[i],
-            marker=dict(color=color)
-        ))
+        color = f"rgb({int(viridis(i / (len(bin_edges) - 1))[0] * 255)}, {int(viridis(i / (len(bin_edges) - 1))[1] * 255)}, {int(viridis(i / (len(bin_edges) - 1))[2] * 255)})"
+        fig.add_trace(
+            go.Bar(
+                x=[(bin_edges[i] + bin_edges[i + 1]) / 2],
+                y=[freq],
+                width=np.diff(bin_edges)[i],
+                marker=dict(color=color),
+            )
+        )
     # Calculate and add the KDE line
     x_kde = np.linspace(min(df["importance_value"]), max(df["importance_value"]), 500)
     kde = gaussian_kde(df["importance_value"])
     y_kde = kde(x_kde) * sum(hist) * (bin_edges[1] - bin_edges[0])
-    fig.add_trace(go.Scatter(x=x_kde, y=y_kde, mode='lines', line_shape='spline', line=dict(color='red')))
+    fig.add_trace(
+        go.Scatter(
+            x=x_kde, y=y_kde, mode="lines", line_shape="spline", line=dict(color="red")
+        )
+    )
     # Additional styling
-    fig.update_layout(title="Distribution of Importance Scores",
-                    xaxis_title="Importance Value",
-                    yaxis_title="Frequency",
-                    showlegend=False)
+    fig.update_layout(
+        title="Distribution of Importance Scores",
+        xaxis_title="Importance Value",
+        yaxis_title="Frequency",
+        showlegend=False,
+    )
     st.plotly_chart(fig, use_container_width=True)
-    
+
     st.write("## Importance Score per Token")
     # Normalize the importance values
-    min_val = df['importance_value'].min()
-    max_val = df['importance_value'].max()
-    normalized_values = (df['importance_value'] - min_val) / (max_val - min_val)
+    min_val = df["importance_value"].min()
+    max_val = df["importance_value"].max()
+    normalized_values = (df["importance_value"] - min_val) / (max_val - min_val)
     # Initialize the figure
     fig = go.Figure()
     # Create the bars, colored based on normalized importance_value
-    for i, (token, norm_value) in enumerate(zip(df['token'], normalized_values)):
-        color = f'rgb({int(viridis(norm_value)[0] * 255)}, {int(viridis(norm_value)[1] * 255)}, {int(viridis(norm_value)[2] * 255)})'
-        fig.add_trace(go.Bar(
-            x=[i],  # Use index for x-axis
-            y=[df['importance_value'].iloc[i]],
-            width=1.0,  # Set the width to make bars touch each other
-            marker=dict(color=color)
-        ))
+    for i, (token, norm_value) in enumerate(zip(df["token"], normalized_values)):
+        color = f"rgb({int(viridis(norm_value)[0] * 255)}, {int(viridis(norm_value)[1] * 255)}, {int(viridis(norm_value)[2] * 255)})"
+        fig.add_trace(
+            go.Bar(
+                x=[i],  # Use index for x-axis
+                y=[df["importance_value"].iloc[i]],
+                width=1.0,  # Set the width to make bars touch each other
+                marker=dict(color=color),
+            )
+        )
     # Additional styling
     fig.update_layout(
         title="Importance Score per Token",
@@ -198,13 +229,13 @@ def analyze_heatmap(df_input):
         showlegend=False,
         bargap=0,  # Remove gap between bars
         xaxis=dict(  # Set tick labels to tokens
-            tickmode='array',
-            tickvals=list(range(len(df['token']))),
-            ticktext=list(df['token'])
-        )
+            tickmode="array",
+            tickvals=list(range(len(df["token"]))),
+            ticktext=list(df["token"]),
+        ),
     )
     # Rotate x-axis labels by 45 degrees
-    fig.update_xaxes(tickangle=45) 
+    fig.update_xaxes(tickangle=45)
     st.plotly_chart(fig, use_container_width=True)
 
     st.write("## Top 10 Most Important Words")
@@ -216,26 +247,41 @@ def analyze_heatmap(df_input):
     st.write(top_10_least_important[["token", "importance_value"]])
 
     correlation, p_value = scipy.stats.pearsonr(df["importance_value"], df["Position"])
-    st.write(f"## Correlation between importance and position in text: {correlation:.2f}")
+    st.write(
+        f"## Correlation between importance and position in text: {correlation:.2f}"
+    )
     st.write(f"P-value: {p_value:.2f}")
 
     st.write("## Correlation Plot")
-    fig = px.scatter(df, x="Position", y="importance_value", trendline="lowess", title="Correlation between Importance and Position in Text")
+    fig = px.scatter(
+        df,
+        x="Position",
+        y="importance_value",
+        trendline="lowess",
+        title="Correlation between Importance and Position in Text",
+    )
     st.plotly_chart(fig, use_container_width=True)
+
 
 def compare_heatmaps(df1, df2):
     # Ensure the DataFrames have the required columns
-    if 'token' not in df1.columns or 'importance_value' not in df1.columns or \
-       'token' not in df2.columns or 'importance_value' not in df2.columns:
-        raise ValueError("Both DataFrames must contain 'token' and 'importance_value' columns.")
+    if (
+        "token" not in df1.columns
+        or "importance_value" not in df1.columns
+        or "token" not in df2.columns
+        or "importance_value" not in df2.columns
+    ):
+        raise ValueError(
+            "Both DataFrames must contain 'token' and 'importance_value' columns."
+        )
 
     # Replace None with ""
-    df1['token'].fillna("", inplace=True)
-    df2['token'].fillna("", inplace=True)
+    df1["token"].fillna("", inplace=True)
+    df2["token"].fillna("", inplace=True)
 
     # Extracting importance scores
-    importance_scores1 = df1['importance_value'].values
-    importance_scores2 = df2['importance_value'].values
+    importance_scores1 = df1["importance_value"].values
+    importance_scores2 = df2["importance_value"].values
 
     # Check length of both DataFrames
     if len(importance_scores1) != len(importance_scores2):
@@ -247,7 +293,9 @@ def compare_heatmaps(df1, df2):
     correlation, _ = pearsonr(importance_scores1, importance_scores2)
 
     # Calculating Cosine similarity
-    cos_similarity = cosine_similarity(importance_scores1.reshape(1, -1), importance_scores2.reshape(1, -1))[0][0]
+    cos_similarity = cosine_similarity(
+        importance_scores1.reshape(1, -1), importance_scores2.reshape(1, -1)
+    )[0][0]
 
     # Calculating Euclidean distance
     euclid_distance = euclidean(importance_scores1, importance_scores2)
@@ -260,9 +308,9 @@ def compare_heatmaps(df1, df2):
 
     # Creating a dictionary to store the results
     results = {
-        'Pearson Correlation': correlation,
-        'Cosine Similarity': cos_similarity,
-        'Euclidean Distance': normalized_euclid_distance,
+        "Pearson Correlation": correlation,
+        "Cosine Similarity": cos_similarity,
+        "Euclidean Distance": normalized_euclid_distance,
         "Kendall's Tau": tau,
     }
 
@@ -270,19 +318,32 @@ def compare_heatmaps(df1, df2):
     with col1:
         # Plotting the importance-by-token for DataFrame 1
         st.write("## Importance by Token for GPT3 Estimation")
-        fig1 = px.bar(df1, x='token', y='importance_value', title='Importance by Token', color_discrete_sequence=['blue'])
+        fig1 = px.bar(
+            df1,
+            x="token",
+            y="importance_value",
+            title="Importance by Token",
+            color_discrete_sequence=["blue"],
+        )
         st.plotly_chart(fig1)
 
     with col2:
         # Plotting the importance-by-token for DataFrame 2
         st.write("## Importance by Token for GPT2 Integrated Gradients")
-        fig2 = px.bar(df2, x='token', y='importance_value', title='Importance by Token', color_discrete_sequence=['red'])
+        fig2 = px.bar(
+            df2,
+            x="token",
+            y="importance_value",
+            title="Importance by Token",
+            color_discrete_sequence=["red"],
+        )
         st.plotly_chart(fig2)
 
     # Display the comparison metrics
     st.write("## Comparison Metrics")
     st.json(results)
     return results
+
 
 def decoded_tokens(string, tokenizer):
     return [tokenizer.decode([x]) for x in tokenizer.encode(string)]
@@ -344,6 +405,7 @@ def normalize_vector(v):
     if norm == 0:
         return v
     return v / norm
+
 
 @retry
 async def get_embedding(input_text, model=None, tokenizer=None):
@@ -418,12 +480,12 @@ async def approximate_importance(
     return cosine_dist
 
 
-async def ablated_relative_importance(input_text, tokenizer, progress_bar, st_column, model=None):
+async def ablated_relative_importance(
+    input_text, tokenizer, progress_bar, st_column, model=None
+):
     original_embedding = await get_embedding(input_text, model, tokenizer)
     tokens = decoded_tokens(input_text, tokenizer)
     importance_scores = []
-
-    
 
     # Prepare the tasks
     tasks = []
@@ -460,7 +522,9 @@ async def process_importance(importance_function, st_column, *args, **kwargs):
     # Initialize the progress bar in Streamlit
     progress_bar = progress_bar_placeholder.progress(0)
 
-    importance_map = await importance_function(progress_bar=progress_bar, st_column=st_column, *args, **kwargs)
+    importance_map = await importance_function(
+        progress_bar=progress_bar, st_column=st_column, *args, **kwargs
+    )
 
     importance_map_df = pd.DataFrame(
         importance_map, columns=["token", "importance_value"]
@@ -488,21 +552,22 @@ async def process_importance(importance_function, st_column, *args, **kwargs):
     gc.collect()
     return importance_log_df
 
+
 def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
     # Convert input_ids and baseline to LongTensors
     input_ids, baseline = input_ids.long(), baseline.long()
 
     # Initialize tensor to store accumulated gradients
     accumulated_grads = None
-    
+
     # Create interpolated inputs
     alphas = torch.linspace(0, 1, n_steps)
     delta = input_ids - baseline
-    
+
     # Initialize tqdm progress bar
     progress_increment = int(1 / n_steps * 100)
     progress = 0
-    
+
     for alpha in alphas:
         # Update tqdm progress bar
         progress += progress_increment
@@ -510,19 +575,21 @@ def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
 
         # In-place modification for memory efficiency
         interpolate = baseline + (alpha * delta).long()
-        
+
         # Convert interpolated samples to embeddings
-        interpolate_embedding = model.transformer.wte(interpolate).clone().detach().requires_grad_(True)
+        interpolate_embedding = (
+            model.transformer.wte(interpolate).clone().detach().requires_grad_(True)
+        )
 
         # Forward pass
         output = model(inputs_embeds=interpolate_embedding, output_attentions=False)[0]
-        
+
         # Aggregate the logits across all positions (using sum in this example)
         aggregated_logit = output.sum()
-        
+
         # Backward pass to calculate gradients
         aggregated_logit.backward()
-        
+
         # In-place addition to save memory
         if accumulated_grads is None:
             accumulated_grads = interpolate_embedding.grad.clone()
@@ -548,8 +615,9 @@ def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
         input_embedding = model.transformer.wte(input_ids)
         baseline_embedding = model.transformer.wte(baseline)
         attributions = (input_embedding - baseline_embedding) * avg_grads
-    
+
     return attributions
+
 
 def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
     # Reserve a placeholder for the progress bar
@@ -559,7 +627,7 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
     progress_bar = progress_bar_placeholder.progress(0)
 
     inputs = torch.tensor([gpt2tokenizer.encode(input_text)])
-    
+
     gpt2tokens = decoded_tokens(input_text, gpt2tokenizer)
 
     # Initialize a baseline as zero tensor
@@ -574,29 +642,34 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
     l2_norm_attributions = np.linalg.norm(attributions_sum, 2)
     normalized_attributions_sum = attributions_sum / l2_norm_attributions
 
-    clamped_attributions_sum = np.where(normalized_attributions_sum < 0, 0, normalized_attributions_sum)
-    
+    clamped_attributions_sum = np.where(
+        normalized_attributions_sum < 0, 0, normalized_attributions_sum
+    )
+
     progress_bar_placeholder.empty()
 
-    attribution_df = pd.DataFrame({
-    'token': gpt2tokens,
-    'importance_value': clamped_attributions_sum
-    })
+    attribution_df = pd.DataFrame(
+        {"token": gpt2tokens, "importance_value": clamped_attributions_sum}
+    )
     return attribution_df
+
 
 st.set_page_config(layout="wide")
 
-@st.cache_resource  
+
+@st.cache_resource
 def load_model(model_version):
     return GPT2LMHeadModel.from_pretrained(model_version, output_attentions=True)
 
+
 @st.cache_resource
 def load_tokenizer(tokenizer_name):
-    return tiktoken.get_encoding(tokenizer_name) 
+    return tiktoken.get_encoding(tokenizer_name)
+
 
 column_progress = {1: 0, 2: 0}
-model_type = 'gpt2'
-model_version = 'gpt2'
+model_type = "gpt2"
+model_version = "gpt2"
 model = load_model(model_version)
 gpt2tokenizer = load_tokenizer("gpt2")
 gpt3tokenizer = load_tokenizer("cl100k_base")
@@ -628,7 +701,9 @@ if st.button("Submit"):
             with col1:
                 st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
                 importance_map_log_df = asyncio.run(
-                    process_importance(ablated_relative_importance, 1, user_input, gpt3tokenizer)
+                    process_importance(
+                        ablated_relative_importance, 1, user_input, gpt3tokenizer
+                    )
                 )
                 render_heatmap(user_input, importance_map_log_df)
                 analyze_heatmap(importance_map_log_df)
@@ -637,20 +712,26 @@ if st.button("Submit"):
             # Place heatmap in the second column
             with col2:
                 st.header("Importance 'Ground Truth' (GPT-2 Integrated Gradients)")
-                attribution_df = process_integrated_gradients(user_input, gpt2tokenizer, model, n_steps=100)
+                attribution_df = process_integrated_gradients(
+                    user_input, gpt2tokenizer, model, n_steps=100
+                )
                 render_heatmap(user_input, attribution_df)
                 analyze_heatmap(attribution_df)
                 df2 = attribution_df
 
         with tab2:
-            with st.spinner('Computing, please wait...'):
-                a2b, b2a = tokenizations.get_alignments(df1['token'].values.tolist(), df2['token'].values.tolist())
+            with st.spinner("Computing, please wait..."):
+                a2b, b2a = tokenizations.get_alignments(
+                    df1["token"].values.tolist(), df2["token"].values.tolist()
+                )
                 aligned_df1, aligned_df2 = align_dataframes(b2a, df1, a2b, df2)
                 compare_heatmaps(aligned_df1, aligned_df2)
     if not ig:
         st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
         importance_map_log_df = asyncio.run(
-            process_importance(ablated_relative_importance, 1, user_input, gpt3tokenizer)
+            process_importance(
+                ablated_relative_importance, 1, user_input, gpt3tokenizer
+            )
         )
         render_heatmap(user_input, importance_map_log_df)
         analyze_heatmap(importance_map_log_df)
