@@ -4,6 +4,7 @@ import os
 from collections import Counter
 from math import sqrt
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import openai
@@ -45,7 +46,7 @@ def render_heatmap(original_text, importance_scores_df):
         )  # Fallback: all-zero array
 
     # Generate a colormap for the heatmap
-    cmap = plt.get_cmap("inferno")
+    cmap = matplotlib.colormaps["inferno"]
 
     # Function to determine text color based on background color
     def get_text_color(bg_color):
@@ -149,7 +150,7 @@ def analyze_heatmap(df_input):
     # Calculate histogram data
     hist, bin_edges = np.histogram(df['importance_value'], bins=20)
     # Get the viridis colormap
-    viridis = plt.cm.get_cmap('viridis', len(bin_edges) - 1)
+    viridis = matplotlib.colormaps['viridis']
     # Initialize the figure
     fig = go.Figure()
     # Create the histogram bars with viridis coloring
