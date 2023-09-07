@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import logging
 import os
 from collections import Counter
 from math import sqrt
@@ -171,7 +172,7 @@ def analyze_heatmap(df_input):
     # Calculate histogram data
     hist, bin_edges = np.histogram(df["importance_value"], bins=20)
     # Get the viridis colormap
-    viridis = matplotlib.colormaps['viridis']
+    viridis = matplotlib.colormaps["viridis"]
     # Initialize the figure
     fig = go.Figure()
     # Create the histogram bars with viridis coloring
@@ -653,6 +654,17 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
     )
     return attribution_df
 
+#
+# MAIN EXECUTION 
+#
+
+# Configure root logger to capture only WARN or higher level logs
+logging.basicConfig(level=logging.WARNING,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Configure logger to capture INFO-level logs
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 st.set_page_config(layout="wide")
 
@@ -685,11 +697,15 @@ st.empty()
 # Text box for prompt
 user_input = st.text_area("Enter your prompt", "")
 
-ig = st.toggle("Run GPT-2 Integrated Gradients (consumes a lot of memory)")
+ig = st.toggle(
+    "Compute GPT-2 Integrated Gradients (may take a while if page is under load)"
+)
 
 # Submit button right below the text box
 if st.button("Submit"):
+    logger.debug(f"PROMPT: {user_input}")
     if ig:
+        logger.debug(f"Processing With Integrated Gradients")
         tab1, tab2 = st.tabs(["Individual Analysis", "Comparative Analysis"])
         df1 = []
         df2 = []
@@ -725,7 +741,8 @@ if st.button("Submit"):
                     df1["token"].values.tolist(), df2["token"].values.tolist()
                 )
                 aligned_df1, aligned_df2 = align_dataframes(b2a, df1, a2b, df2)
-                compare_heatmaps(aligned_df1, aligned_df2)
+                results = compare_heatmaps(aligned_df1, aligned_df2)
+                logger.debug(f"PROMPT RESULTS:\nPROMPT: {user_input}\nRESULTS: {results}")
     if not ig:
         st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
         importance_map_log_df = asyncio.run(
