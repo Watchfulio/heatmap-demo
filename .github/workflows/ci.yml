@@ -43,32 +43,15 @@ jobs:
         with:
           mask-password: 'true'
 
-      - name: cache docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-single-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-single-buildx
-
       - name: build and push
-        uses: docker/build-push-action@v4
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache-new
-          push: true
-          tags: ${{ steps.login-ecr.outputs.registry }}/app/${{ github.event.repository.name }}:${{ github.sha }}
+        run: |
+          repository="${{ steps.login-ecr.outputs.registry }}/app/${{ github.event.repository.name }}"
+          docker pull "${repository}:latest" || true
+          docker build -t "${repository}:${{ github.sha }}" -t "${repository}:latest" .
+          docker push "${repository}:${{ github.sha }}"
+          docker push "${repository}:latest"
 
       - name: deploy to ecs
         run: |
           bin/deploy $APP_SHORT_ENV task ${{ github.sha }}
           bin/deploy $APP_SHORT_ENV service ${{ github.sha }}
-
-      # Temp fix
-      # https://github.com/docker/build-push-action/issues/252
-      # https://github.com/moby/buildkit/issues/1896
-      - name: move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
