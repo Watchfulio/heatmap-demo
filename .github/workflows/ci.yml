@@ -57,10 +57,19 @@ jobs:
           push: true
           tags: ${{ steps.login-ecr.outputs.registry }}/app/${{ github.event.repository.name }}:${{ github.sha }}
 
+      - name: deploy to ecs
+        run: |
+          bin/deploy $APP_SHORT_ENV task ${{ github.sha }}
+          bin/deploy $APP_SHORT_ENV service ${{ github.sha }}
+        env:
+          AWS_VPC_NAME: default
+          APP_SHORT_ENV: prod
+          APP_NAME: heatmap-demo
+
       # Temp fix
       # https://github.com/docker/build-push-action/issues/252
       # https://github.com/moby/buildkit/issues/1896
-      - name: Move cache
+      - name: move cache
         run: |
           rm -rf /tmp/.buildx-cache
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache

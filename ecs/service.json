@@ -1,0 +1,53 @@
+{
+    "cluster": "APP_SHORT_ENV-heatmap-demo",
+    "desiredCount": 1,
+    "launchType": "FARGATE",
+    "propagateTags": "SERVICE",
+    "serviceName": "heatmap-demo",
+    "tags": [
+        {
+            "key": "app_name",
+            "value": "heatmap-demo"
+        },
+        {
+            "key": "environment",
+            "value": "APP_SHORT_ENV"
+        }
+    ],
+    "loadBalancers": [
+        {
+            "containerName": "app",
+            "containerPort": 5000
+        }
+    ],
+    "deploymentConfiguration": {
+        "deploymentCircuitBreaker": {
+            "enable": true,
+            "rollback": true
+        },
+        "maximumPercent": 250
+    },
+    "enableECSManagedTags": true,
+    "enableExecuteCommand": true,
+    "taskDefinition": "APP_SHORT_ENV-heatmap-demo",
+    "networkConfiguration": {
+        "awsvpcConfiguration": {
+            "assignPublicIp": "ENABLED",
+            "securityGroups": [],
+            "subnets": []
+        }
+    },
+    "serviceConnectConfiguration": {
+        "enabled": true,
+        "services": [
+            {
+                "clientAliases": [
+                    {
+                        "port": 5000
+                    }
+                ],
+                "portName": "heatmap-demo-5000"
+            }
+        ]
+    }
+}

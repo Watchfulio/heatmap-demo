@@ -1,0 +1,77 @@
+{
+    "containerDefinitions": [
+        {
+            "entryPoint": [
+                "streamlit",
+                "run",
+                "streamlit_app.py",
+                "--server.port",
+                "5000"
+            ],
+            "environment": [
+                {
+                    "name": "AWS_REGION",
+                    "value": "us-west-1"
+                },
+                {
+                    "name": "STREAMLIT_SERVER_ADDRESS",
+                    "value": "0.0.0.0"
+                }
+            ],
+            "essential": true,
+            "image": "610410161133.dkr.ecr.us-west-1.amazonaws.com/app/heatmap-demo:5",
+            "linuxParameters": {
+                "initProcessEnabled": true
+            },
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "APP_SHORT_ENV-heatmap-demo",
+                    "awslogs-region": "us-west-1",
+                    "awslogs-stream-prefix": "heatmap-demo"
+                }
+            },
+            "name": "app",
+            "portMappings": [
+                {
+                    "containerPort": 5000,
+                    "hostPort": 5000,
+                    "name": "heatmap-demo-5000",
+                    "protocol": "tcp"
+                }
+            ],
+            "secrets": [
+                {
+                    "name": "OPENAI_API_KEY",
+                    "valueFrom": "arn:aws:ssm:us-west-1:610410161133:parameter/APP_SHORT_ENV/heatmap-demo/env.openai_api_key"
+                },
+                {
+                    "name": "OPENAI_ORGANIZATION",
+                    "valueFrom": "arn:aws:ssm:us-west-1:610410161133:parameter/APP_SHORT_ENV/heatmap-demo/env.openai_organization"
+                }
+            ]
+        }
+    ],
+    "cpu": "4096",
+    "taskRoleArn": "arn:aws:iam::610410161133:role/prod-heatmap-demo-ecs-task-role",
+    "executionRoleArn": "arn:aws:iam::610410161133:role/APP_SHORT_ENV-heatmap-demo-ecs-task-execution-role",
+    "family": "APP_SHORT_ENV-heatmap-demo",
+    "memory": "30720",
+    "networkMode": "awsvpc",
+    "runtimePlatform": {
+        "operatingSystemFamily": "LINUX"
+    },
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "tags": [
+        {
+            "key": "app_name",
+            "value": "heatmap-demo"
+        },
+        {
+            "key": "environment",
+            "value": "APP_SHORT_ENV"
+        }
+    ]
+}
