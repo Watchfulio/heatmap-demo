@@ -11,9 +11,12 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     env:
+      APP_NAME: heatmap-demo
+      APP_SHORT_ENV: prod
       AWS_ACCOUNT_ID: 610410161133
       AWS_REGION: us-west-1
-      AWS_ROLE_NAME: github-actions-app-heatmap-demo
+      AWS_ROLE_NAME: github-actions-prod-heatmap-demo
+      AWS_VPC_NAME: default
     permissions:
       id-token: write   # This is required for requesting the JWT
       contents: read    # This is required for actions/checkout
@@ -61,10 +64,6 @@ jobs:
         run: |
           bin/deploy $APP_SHORT_ENV task ${{ github.sha }}
           bin/deploy $APP_SHORT_ENV service ${{ github.sha }}
-        env:
-          AWS_VPC_NAME: default
-          APP_SHORT_ENV: prod
-          APP_NAME: heatmap-demo
 
       # Temp fix
       # https://github.com/docker/build-push-action/issues/252
