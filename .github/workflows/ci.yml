@@ -1,0 +1,45 @@
+---
+name: Global CI
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCOUNT_ID: 610410161133
+      AWS_REGION: us-west-1
+      AWS_ROLE_NAME: github-actions-app-heatmap-demo
+    permissions:
+      id-token: write   # This is required for requesting the JWT
+      contents: read    # This is required for actions/checkout
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+
+      - name: set up qemu
+        uses: docker/setup-qemu-action@v2
+
+      - name: set up docker buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: configure aws credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/${{ env.AWS_ROLE_NAME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: login to amazon ecr
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: build and push
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/app/${{ github.event.repository.name }}:${{ github.sha }}
