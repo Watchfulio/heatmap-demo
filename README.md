@@ -6,7 +6,9 @@ You can find a live version of the demo [here](https://heatmap-demo.pilot.watchf
 
 ---
 
-GIF
+<p align="center">
+    <img src="https://s11.gifyu.com/images/SgXak.gif"></img>
+</p>
 
 ---
 
