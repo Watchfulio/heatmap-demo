@@ -30,26 +30,39 @@ openai.organization = os.getenv("OPENAI_ORGANIZATION", "Not found")
 
 
 def render_heatmap(original_text, importance_scores_df):
+    """
+    Renders a heatmap visualization of token importances for the given text using Streamlit.
+
+    Parameters:
+    - original_text (str): The text for which token importance scores are to be visualized.
+    - importance_scores_df (pd.DataFrame): A dataframe containing tokens and their respective importance values. It is expected to have columns: ['token', 'importance_value'].
+
+    Returns:
+    None. The heatmap is displayed using Streamlit.
+    """
+
     # Extract the importance scores
     importance_values = importance_scores_df["importance_value"].values
 
-    # Check for division by zero during normalization
+    # Normalize the importance scores to be between 0 and 1
+    # This helps in color mapping for the heatmap
     min_val = np.min(importance_values)
     max_val = np.max(importance_values)
 
+    # Handle the case of division by zero during normalization
     if max_val - min_val != 0:
         normalized_importance_values = (importance_values - min_val) / (
             max_val - min_val
         )
     else:
-        normalized_importance_values = np.zeros_like(
-            importance_values
-        )  # Fallback: all-zero array
+        # Fallback: all-zero array
+        normalized_importance_values = np.zeros_like(importance_values)
 
     # Generate a colormap for the heatmap
     cmap = matplotlib.colormaps["inferno"]
 
-    # Function to determine text color based on background color
+    # Helper function to determine the text color based on the background color
+    # This ensures text remains readable irrespective of the heatmap color
     def get_text_color(bg_color):
         brightness = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
         if brightness < 0.5:
@@ -57,7 +70,7 @@ def render_heatmap(original_text, importance_scores_df):
         else:
             return "black"
 
-    # Initialize pointers for the original text and token importance
+    # Pointers to navigate through the original text and token importance values
     original_pointer = 0
     token_pointer = 0
 
@@ -82,6 +95,20 @@ def render_heatmap(original_text, importance_scores_df):
 
 
 def align_dataframes(b2a, df1, a2b, df2):
+    """
+    Aligns two dataframes based on provided alignment mappings.
+
+    Parameters:
+    - b2a (list of lists): Alignment mapping from the second dataframe (df2) to the first dataframe (df1).
+    - df1 (pd.DataFrame): First dataframe containing tokens and their importance values. Expected to have columns: ['token', 'importance_value'].
+    - a2b (list of lists): Alignment mapping from the first dataframe (df1) to the second dataframe (df2).
+    - df2 (pd.DataFrame): Second dataframe containing tokens and their importance values. Expected to have columns: ['token', 'importance_value'].
+
+    Returns:
+    - aligned_df1 (pd.DataFrame): Aligned version of the first dataframe.
+    - aligned_df2 (pd.DataFrame): Aligned version of the second dataframe.
+    """
+
     aligned_strs1 = []
     aligned_vals1 = []
     aligned_strs2 = []
@@ -360,6 +387,23 @@ def scale_importance_log(
     scaling_factor=1.0,
     bias=0.0,
 ):
+    """
+    Scale the importance scores using a logarithmic transformation.
+
+    Parameters:
+    - importance_scores (list of tuples): List of (token, score) tuples where each tuple represents a token and its corresponding importance score.
+    - base (float, optional): Base of the logarithm. If not provided, natural logarithm will be used.
+    - offset (float, optional): Value added to the importance scores after subtracting the minimum. Defaults to 0.0.
+    - min_percentile (int, optional): Minimum percentile value used for clipping the scores. Defaults to 0.
+    - max_percentile (int, optional): Maximum percentile value used for clipping the scores. Defaults to 100.
+    - smoothing_constant (float, optional): Small constant added to the scores to ensure they're non-zero. Defaults to 1e-10.
+    - scaling_factor (float, optional): Factor to scale the logarithmically transformed values. Defaults to 1.0.
+    - bias (float, optional): Bias added after applying the scaling factor. Defaults to 0.0.
+
+    Returns:
+    - scaled_importance_scores (list of tuples): List of (token, scaled_score) tuples where each tuple represents a token and its scaled importance score.
+    """
+
     # Extract the importance values
     importance_values = np.array([score[1] for score in importance_scores])
 
@@ -410,6 +454,25 @@ def normalize_vector(v):
 
 @retry
 async def get_embedding(input_text, model=None, tokenizer=None):
+    """
+    Asynchronously get the text embedding for a given input text.
+
+    This function supports two modes:
+    1. If no model is specified, it queries the OpenAI API to get the embedding.
+    2. If a model is specified, it uses the provided model and tokenizer to generate embeddings.
+
+    Parameters:
+    - input_text (str): The text for which the embedding needs to be generated.
+    - model (torch.nn.Module, optional): Pre-trained model for generating embeddings. If not specified, OpenAI API will be used.
+    - tokenizer (transformers.PreTrainedTokenizer, optional): Tokenizer corresponding to the provided model.
+
+    Returns:
+    - np.ndarray: The embedding of the input text.
+
+    Raises:
+    - ValueError: If 'model' is specified but 'tokenizer' is not.
+    """
+
     if not model:
         resp = await openai.Embedding.acreate(
             input=input_text, model="text-embedding-ada-002"
@@ -468,8 +531,26 @@ async def approximate_importance(
     model=None,
     tokenizer=None,
 ):
+    """
+    Asynchronously compute the importance of a perturbation by comparing embeddings of the original text and its perturbed version.
+
+    Importance is approximated using the cosine distance between the embeddings of the original and perturbed texts.
+
+    Parameters:
+    - perturbed_text (str): The perturbed version of the text.
+    - original_embedding (np.ndarray): The embedding of the original text.
+    - progress_bar (streamlit.Progress): Streamlit progress bar to display progress.
+    - progress_percent (float): Percentage increment for each completed step.
+    - st_column (str): Column name in the Streamlit app to update the progress.
+    - model (torch.nn.Module, optional): Pre-trained model for generating embeddings. If not specified, the default method will be used.
+    - tokenizer (transformers.PreTrainedTokenizer, optional): Tokenizer corresponding to the provided model.
+
+    Returns:
+    - float: Cosine distance between the embeddings of the original and perturbed texts, representing the importance of the perturbation.
+    """
+
     perturbed_embedding = await get_embedding(perturbed_text, model, tokenizer)
-    # Compute "importance" measures
+    # Compute "importance" measure
     cosine_dist = (
         1
         - cosine_similarity(
@@ -484,6 +565,23 @@ async def approximate_importance(
 async def ablated_relative_importance(
     input_text, tokenizer, progress_bar, st_column, model=None
 ):
+    """
+    Asynchronously compute the relative importance of each token in the input text.
+
+    The importance of a token is approximated by measuring the effect of its removal on the text's embedding.
+    Importance is represented as the cosine distance between the embeddings of the original and perturbed (token removed) texts.
+
+    Parameters:
+    - input_text (str): The text for which token importances are to be computed.
+    - tokenizer (transformers.PreTrainedTokenizer): Tokenizer corresponding to the model.
+    - progress_bar (streamlit.Progress): Streamlit progress bar to display progress.
+    - st_column (str): Column name in the Streamlit app to update the progress.
+    - model (torch.nn.Module, optional): Pre-trained model for generating embeddings. If not specified, the default method will be used.
+
+    Returns:
+    - importance_scores (list of tuples): List of (token, importance) tuples where each tuple represents a token and its relative importance.
+    """
+
     original_embedding = await get_embedding(input_text, model, tokenizer)
     tokens = decoded_tokens(input_text, tokenizer)
     importance_scores = []
@@ -517,6 +615,22 @@ async def ablated_relative_importance(
 
 
 async def process_importance(importance_function, st_column, *args, **kwargs):
+    """
+    Asynchronously compute token importance values for a given text and post-process them using logarithmic scaling.
+
+    Parameters:
+    - importance_function (async function): Asynchronous function that computes raw token importance values.
+    - st_column (str): Column name in the Streamlit app to update the progress.
+    - *args: Positional arguments passed to the `importance_function`.
+    - **kwargs: Keyword arguments passed to the `importance_function`.
+
+    Returns:
+    - importance_log_df (pd.DataFrame): DataFrame containing tokens and their post-processed importance values.
+
+    Notes:
+    The importance values are post-processed using logarithmic scaling to enhance the visualization. The progress of the computation is displayed in a Streamlit progress bar.
+    """
+
     # Reserve a placeholder for the progress bar
     progress_bar_placeholder = st.empty()
 
@@ -555,6 +669,22 @@ async def process_importance(importance_function, st_column, *args, **kwargs):
 
 
 def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
+    """
+    Compute attributions of each input feature using the Integrated Gradients method.
+
+    Integrated Gradients is an interpretability method that assigns importance scores to each input feature by approximating the integral of the model's gradients with respect to the inputs along a straight path from a baseline input to the given input.
+
+    Parameters:
+    - input_ids (torch.Tensor): Input tensor of shape (sequence_length,) representing the IDs of tokens in the input sequence.
+    - baseline (torch.Tensor): Baseline input tensor of the same shape as `input_ids`, typically representing an uninformative or neutral input.
+    - model (torch.nn.Module): Pre-trained model for which attributions are to be computed.
+    - progress_bar (streamlit.Progress): Streamlit progress bar to display progress.
+    - n_steps (int, optional): Number of interpolation steps between the baseline and the input. Defaults to 100.
+
+    Returns:
+    - attributions (torch.Tensor): Tensor of the same shape as `input_ids` containing the computed attributions for each input feature.
+    """
+
     # Convert input_ids and baseline to LongTensors
     input_ids, baseline = input_ids.long(), baseline.long()
 
@@ -621,6 +751,21 @@ def integrated_gradients(input_ids, baseline, model, progress_bar, n_steps=100):
 
 
 def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
+    """
+    Compute token importance values for a given text using the Integrated Gradients method, and post-process the results.
+
+    Integrated Gradients provides an importance score for each input feature by approximating the integral of the model's gradients with respect to the inputs along a straight path from a baseline input to the input of interest.
+
+    Parameters:
+    - input_text (str): The text for which token importances are to be computed.
+    - gpt2tokenizer (transformers.PreTrainedTokenizer): GPT-2 tokenizer for encoding the input text and decoding tokens.
+    - model (torch.nn.Module): Pre-trained model for which attributions are to be computed.
+    - n_steps (int, optional): Number of interpolation steps between the baseline and the input. Defaults to 100.
+
+    Returns:
+    - attribution_df (pd.DataFrame): DataFrame containing tokens and their post-processed importance values.
+    """
+
     # Reserve a placeholder for the progress bar
     progress_bar_placeholder = st.empty()
 
