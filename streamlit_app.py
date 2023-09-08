@@ -668,7 +668,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Token Heatmap", page_icon=":fire:")
 
 
 @st.cache_resource
