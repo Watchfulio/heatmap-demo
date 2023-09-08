@@ -185,8 +185,10 @@ def align_dataframes(b2a, df1, a2b, df2):
     return aligned_df1, aligned_df2
 
 
-def analyze_heatmap(df_input):
+def analyze_heatmap(df_input, estimation):
     df = df_input.copy()
+
+    prepend = "[ESTIMATION]" if estimation else "[INTEGRATED GRADIENTS]"
 
     if "token" not in df.columns or "importance_value" not in df.columns:
         raise ValueError(
@@ -195,7 +197,6 @@ def analyze_heatmap(df_input):
 
     df["Position"] = range(len(df))
 
-    st.write("## Distribution of Importance Scores")
     # Calculate histogram data
     hist, bin_edges = np.histogram(df["importance_value"], bins=20)
     # Get the viridis colormap
@@ -224,14 +225,14 @@ def analyze_heatmap(df_input):
     )
     # Additional styling
     fig.update_layout(
-        title="Distribution of Importance Scores",
+        title=f"{prepend} Distribution of Importance Scores",
+        title_font={'size': 25},
         xaxis_title="Importance Value",
         yaxis_title="Frequency",
         showlegend=False,
     )
     st.plotly_chart(fig, use_container_width=True)
 
-    st.write("## Importance Score per Token")
     # Normalize the importance values
     min_val = df["importance_value"].min()
     max_val = df["importance_value"].max()
@@ -251,7 +252,8 @@ def analyze_heatmap(df_input):
         )
     # Additional styling
     fig.update_layout(
-        title="Importance Score per Token",
+        title=f"{prepend} Importance Score per Token",
+        title_font={'size': 25},
         xaxis_title="Token",
         yaxis_title="Importance Value",
         showlegend=False,
@@ -266,28 +268,28 @@ def analyze_heatmap(df_input):
     fig.update_xaxes(tickangle=45)
     st.plotly_chart(fig, use_container_width=True)
 
-    st.write("## Top 10 Most Important Words")
+    st.write(f"#### {prepend} Top 10 Most Important Words")
     top_10_important = df.nlargest(10, "importance_value")
     st.write(top_10_important[["token", "importance_value"]])
 
-    st.write("## Top 10 Least Important Words")
+    st.write(f"#### {prepend} Top 10 Least Important Words")
     top_10_least_important = df.nsmallest(10, "importance_value")
     st.write(top_10_least_important[["token", "importance_value"]])
 
     correlation, p_value = scipy.stats.pearsonr(df["importance_value"], df["Position"])
     st.write(
-        f"## Correlation between importance and position in text: {correlation:.2f}"
+        f"#### {prepend} Correlation between importance and position in text: {correlation:.2f}"
     )
     st.write(f"P-value: {p_value:.2f}")
 
-    st.write("## Correlation Plot")
     fig = px.scatter(
         df,
         x="Position",
         y="importance_value",
         trendline="lowess",
-        title="Correlation between Importance and Position in Text",
+        title=f"{prepend} Correlation between Importance and Position",
     )
+    fig.update_layout(title_font={'size': 25})
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -345,26 +347,26 @@ def compare_heatmaps(df1, df2):
     col1, col2 = st.columns([0.5, 0.5])
     with col1:
         # Plotting the importance-by-token for DataFrame 1
-        st.write("## Importance by Token for GPT3 Estimation")
         fig1 = px.bar(
             df1,
             x="token",
             y="importance_value",
-            title="Importance by Token",
+            title="[ESTIMATION] Importance by Token",
             color_discrete_sequence=["blue"],
         )
+        fig1.update_layout(title_font={'size': 25})
         st.plotly_chart(fig1)
 
     with col2:
         # Plotting the importance-by-token for DataFrame 2
-        st.write("## Importance by Token for GPT2 Integrated Gradients")
         fig2 = px.bar(
             df2,
             x="token",
             y="importance_value",
-            title="Importance by Token",
+            title="[INTEGRATED GRADIENTS] Importance by Token",
             color_discrete_sequence=["red"],
         )
+        fig2.update_layout(title_font={'size': 25})
         st.plotly_chart(fig2)
 
     # Display the comparison metrics
@@ -875,7 +877,7 @@ if st.button("Submit"):
                     )
                 )
                 render_heatmap(user_input, importance_map_log_df)
-                analyze_heatmap(importance_map_log_df)
+                analyze_heatmap(importance_map_log_df, estimation=True)
                 df1 = importance_map_log_df
 
             # Place heatmap in the second column
@@ -885,7 +887,7 @@ if st.button("Submit"):
                     user_input, gpt2tokenizer, model, n_steps=100
                 )
                 render_heatmap(user_input, attribution_df)
-                analyze_heatmap(attribution_df)
+                analyze_heatmap(attribution_df, estimation=False)
                 df2 = attribution_df
 
         with tab2:
@@ -906,7 +908,7 @@ if st.button("Submit"):
             )
         )
         render_heatmap(user_input, importance_map_log_df)
-        analyze_heatmap(importance_map_log_df)
+        analyze_heatmap(importance_map_log_df, estimation=True)
 
 # Create empty spaces for vertical centering
 st.empty()
