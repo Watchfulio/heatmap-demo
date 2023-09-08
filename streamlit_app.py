@@ -689,7 +689,7 @@ gpt2tokenizer = load_tokenizer("gpt2")
 gpt3tokenizer = load_tokenizer("cl100k_base")
 
 
-st.title("A surprisingly effective way to estimate token importances in LLM prompts")
+st.title("A surprisingly effective way to estimate token importance in LLM prompts")
 st.markdown(
     "This is a demo of the token estimation approach detailed in [this blog post](https://watchful.io/). It only uses embeddings to estimate the importance of each token in a prompt, so it's super fast and cheap to run. Turn on Integrated Gradients if you want to see how the estimation compares to what the model *actually* thought was important."
 )
