@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import html
 import logging
 import os
 from collections import Counter
@@ -28,13 +29,11 @@ from transformers import GPT2LMHeadModel
 openai.api_key = os.getenv("OPENAI_API_KEY", "Not found")
 openai.organization = os.getenv("OPENAI_ORGANIZATION", "Not found")
 
-
-def render_heatmap(original_text, importance_scores_df):
+def render_heatmap(importance_scores_df):
     """
     Renders a heatmap visualization of token importances for the given text using Streamlit.
 
     Parameters:
-    - original_text (str): The text for which token importance scores are to be visualized.
     - importance_scores_df (pd.DataFrame): A dataframe containing tokens and their respective importance values. It is expected to have columns: ['token', 'importance_value'].
 
     Returns:
@@ -45,24 +44,18 @@ def render_heatmap(original_text, importance_scores_df):
     importance_values = importance_scores_df["importance_value"].values
 
     # Normalize the importance scores to be between 0 and 1
-    # This helps in color mapping for the heatmap
     min_val = np.min(importance_values)
     max_val = np.max(importance_values)
 
-    # Handle the case of division by zero during normalization
     if max_val - min_val != 0:
-        normalized_importance_values = (importance_values - min_val) / (
-            max_val - min_val
-        )
+        normalized_importance_values = (importance_values - min_val) / (max_val - min_val)
     else:
-        # Fallback: all-zero array
         normalized_importance_values = np.zeros_like(importance_values)
 
     # Generate a colormap for the heatmap
     cmap = matplotlib.colormaps["inferno"]
 
     # Helper function to determine the text color based on the background color
-    # This ensures text remains readable irrespective of the heatmap color
     def get_text_color(bg_color):
         brightness = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2]
         if brightness < 0.5:
@@ -70,29 +63,21 @@ def render_heatmap(original_text, importance_scores_df):
         else:
             return "black"
 
-    # Pointers to navigate through the original text and token importance values
-    original_pointer = 0
-    token_pointer = 0
+    # Initialize HTML string
+    html_string = ""
 
-    # Create an HTML representation
-    html = ""
-    while original_pointer < len(original_text):
-        token = importance_scores_df.loc[token_pointer, "token"]
-        if original_pointer == original_text.find(token, original_pointer):
-            importance = normalized_importance_values[token_pointer]
-            rgba = cmap(importance)
-            bg_color = rgba[:3]
-            text_color = get_text_color(bg_color)
-            html += f'<span style="background-color: rgba({int(bg_color[0]*255)}, {int(bg_color[1]*255)}, {int(bg_color[2]*255)}, 1); color: {text_color};">{token}</span>'
-            original_pointer += len(token)
-            token_pointer += 1
-        else:
-            html += original_text[original_pointer]
-            original_pointer += 1
+    # Loop over tokens and construct the HTML string
+    for idx, (token, importance) in importance_scores_df.iterrows():
+        rgba = cmap(normalized_importance_values[idx])
+        bg_color = rgba[:3]
+        text_color = get_text_color(bg_color)
+        
+        # Explicitly handle special characters
+        token_escaped = html.escape(token).replace('`', '&#96;').replace('$', '&#36;')  # Handle backticks and dollar signs
+        html_string += f'<span style="background-color: rgba({int(bg_color[0]*255)}, {int(bg_color[1]*255)}, {int(bg_color[2]*255)}, 1); color: {text_color};">{token_escaped}</span> '
 
     # Display using Streamlit
-    st.markdown(html, unsafe_allow_html=True)
-
+    st.markdown(html_string, unsafe_allow_html=True)
 
 def align_dataframes(b2a, df1, a2b, df2):
     """
@@ -277,10 +262,6 @@ def analyze_heatmap(df_input, estimation):
     st.write(top_10_least_important[["token", "importance_value"]])
 
     correlation, p_value = scipy.stats.pearsonr(df["importance_value"], df["Position"])
-    st.write(
-        f"#### {prepend} Correlation between importance and position in text: {correlation:.2f}"
-    )
-    st.write(f"P-value: {p_value:.2f}")
 
     fig = px.scatter(
         df,
@@ -291,6 +272,9 @@ def analyze_heatmap(df_input, estimation):
     )
     fig.update_layout(title_font={'size': 25})
     st.plotly_chart(fig, use_container_width=True)
+    
+    st.write(f"Correlation between importance & position: {correlation:.2f}")
+    st.write(f"P-value: {p_value:.2f}")
 
 
 def compare_heatmaps(df1, df2):
@@ -838,7 +822,7 @@ gpt3tokenizer = load_tokenizer("cl100k_base")
 
 st.title("A surprisingly effective way to estimate token importance in LLM prompts")
 st.markdown(
-    "This is a demo of the token estimation approach detailed in [this blog post](https://watchful.io/). It only uses embeddings to estimate the importance of each token in a prompt, so it's super fast and cheap to run. Turn on Integrated Gradients if you want to see how the estimation compares to what the model *actually* thought was important."
+    "This is a demo of the token estimation approach detailed in [this blog post](https://www.watchful.io/blog/a-surprisingly-effective-way-to-estimate-token-importance-in-llm-prompts). It only uses embeddings to estimate the importance of each token in a prompt, so it's super fast and cheap to run. Turn on Integrated Gradients if you want to see how the estimation compares to what the model *actually* thought was important."
 )
 st.markdown(
     "You can use these importances as a roadmap to improving your prompt - the more important a token, the bigger the effect it has on the prompt's output."
@@ -876,7 +860,7 @@ if st.button("Submit"):
                         ablated_relative_importance, 1, user_input, gpt3tokenizer
                     )
                 )
-                render_heatmap(user_input, importance_map_log_df)
+                render_heatmap(importance_map_log_df)
                 analyze_heatmap(importance_map_log_df, estimation=True)
                 df1 = importance_map_log_df
 
@@ -886,7 +870,7 @@ if st.button("Submit"):
                 attribution_df = process_integrated_gradients(
                     user_input, gpt2tokenizer, model, n_steps=100
                 )
-                render_heatmap(user_input, attribution_df)
+                render_heatmap(attribution_df)
                 analyze_heatmap(attribution_df, estimation=False)
                 df2 = attribution_df
 
@@ -907,7 +891,7 @@ if st.button("Submit"):
                 ablated_relative_importance, 1, user_input, gpt3tokenizer
             )
         )
-        render_heatmap(user_input, importance_map_log_df)
+        render_heatmap(importance_map_log_df)
         analyze_heatmap(importance_map_log_df, estimation=True)
 
 # Create empty spaces for vertical centering
