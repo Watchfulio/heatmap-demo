@@ -654,13 +654,15 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
     )
     return attribution_df
 
+
 #
-# MAIN EXECUTION 
+# MAIN EXECUTION
 #
 
 # Configure root logger to capture only WARN or higher level logs
-logging.basicConfig(level=logging.WARNING,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 # Configure logger to capture INFO-level logs
 logger = logging.getLogger(__name__)
@@ -688,6 +690,12 @@ gpt3tokenizer = load_tokenizer("cl100k_base")
 
 
 st.title("A surprisingly effective way to estimate token importances in LLM prompts")
+st.markdown(
+    "This is a demo of the token estimation approach detailed in [this blog post](https://watchful.io/). It only uses embeddings to estimate the importance of each token in a prompt, so it's super fast and cheap to run. Turn on Integrated Gradients if you want to see how the estimation compares to what the model *actually* thought was important."
+)
+st.markdown(
+    "You can use these importances as a roadmap to improving your prompt - the more important a token, the bigger the effect it has on the prompt's output."
+)
 
 # Create empty spaces for vertical centering
 st.empty()
@@ -742,7 +750,9 @@ if st.button("Submit"):
                 )
                 aligned_df1, aligned_df2 = align_dataframes(b2a, df1, a2b, df2)
                 results = compare_heatmaps(aligned_df1, aligned_df2)
-                logger.debug(f"PROMPT RESULTS:\nPROMPT: {user_input}\nRESULTS: {results}")
+                logger.debug(
+                    f"PROMPT RESULTS:\nPROMPT: {user_input}\nRESULTS: {results}"
+                )
     if not ig:
         st.header("Importance Estimation (GPT-3 Embeddings, Log Scaled)")
         importance_map_log_df = asyncio.run(
