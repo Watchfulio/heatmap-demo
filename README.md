@@ -6,9 +6,7 @@ You can find a live version of the demo [here](https://heatmap-demo.pilot.watchf
 
 ---
 
-<p align="center">
-    <img src="https://s11.gifyu.com/images/SgXak.gif"></img>
-</p>
+![Token Importance Demo GIF](https://github.com/Watchfulio/heatmap-demo/assets/1537245/ab675820-50e3-4b77-b833-3b9e2f934fea)
 
 ---
 
