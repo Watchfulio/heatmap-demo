@@ -8,3 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+CMD ["streamlit", "run", "streamlit_app.py"]
