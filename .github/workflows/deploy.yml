@@ -21,3 +21,4 @@ jobs:
         with:
           git_remote_url: 'ssh://dokku@deploy.demos.watchful.io:22/heatmap'
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          branch: main
