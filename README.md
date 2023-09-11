@@ -2,7 +2,7 @@
 
 **A surprisingly effective way to estimate token importance in LLM prompts**
 
-You can find a live version of the demo [here](https://heatmap-demo.pilot.watchful.io/)
+You can find a live version of the demo [here](https://heatmap.demos.watchful.io/)
 
 ---
 
