@@ -12,5 +12,5 @@ streamlit==1.26.0
 tenacity==8.2.3
 tiktoken==0.4.0
 torch==1.13.1
-transformers==4.33.0
+transformers==4.36.0
 watchdog==3.0.0
