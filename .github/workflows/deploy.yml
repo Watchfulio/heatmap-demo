@@ -9,6 +9,7 @@ on:
 
 env:
   APP_NAME: heatmap
+  SERVER_NAME: deploy.demos.watchful.io
 
 jobs:
   deploy:
@@ -22,6 +23,6 @@ jobs:
       - name: Push to dokku
         uses: dokku/github-action@master
         with:
-          git_remote_url: 'ssh://dokku@deploy.demos.watchful.io:22/${{ env.APP_NAME }}'
+          git_remote_url: 'ssh://dokku@${{ env.SERVER_NAME }}:22/${{ env.APP_NAME }}'
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
           branch: main
