@@ -7,27 +7,25 @@ from collections import Counter
 from math import sqrt
 
 import matplotlib
-import matplotlib.pyplot as plt
 import numpy as np
 import openai
 import pandas as pd
-import scipy
-import seaborn as sns
-import streamlit as st
-import tiktoken
-import spacy_alignments as tokenizations
-import torch
 import plotly.express as px
 import plotly.graph_objects as go
-from sklearn.metrics.pairwise import cosine_similarity
-from scipy.stats import pearsonr, kendalltau, gaussian_kde
+import scipy
+import spacy_alignments as tokenizations
+import streamlit as st
+import tiktoken
+import torch
 from scipy.spatial.distance import euclidean
+from scipy.stats import gaussian_kde, kendalltau, pearsonr
+from sklearn.metrics.pairwise import cosine_similarity
 from tenacity import retry
 from transformers import GPT2LMHeadModel
 
-
 openai.api_key = os.getenv("OPENAI_API_KEY", "Not found")
 openai.organization = os.getenv("OPENAI_ORGANIZATION", "Not found")
+
 
 def render_heatmap(importance_scores_df):
     """
@@ -48,7 +46,9 @@ def render_heatmap(importance_scores_df):
     max_val = np.max(importance_values)
 
     if max_val - min_val != 0:
-        normalized_importance_values = (importance_values - min_val) / (max_val - min_val)
+        normalized_importance_values = (importance_values - min_val) / (
+            max_val - min_val
+        )
     else:
         normalized_importance_values = np.zeros_like(importance_values)
 
@@ -71,13 +71,16 @@ def render_heatmap(importance_scores_df):
         rgba = cmap(normalized_importance_values[idx])
         bg_color = rgba[:3]
         text_color = get_text_color(bg_color)
-        
+
         # Explicitly handle special characters
-        token_escaped = html.escape(token).replace('`', '&#96;').replace('$', '&#36;')  # Handle backticks and dollar signs
+        token_escaped = (
+            html.escape(token).replace("`", "&#96;").replace("$", "&#36;")
+        )  # Handle backticks and dollar signs
         html_string += f'<span style="background-color: rgba({int(bg_color[0]*255)}, {int(bg_color[1]*255)}, {int(bg_color[2]*255)}, 1); color: {text_color};">{token_escaped}</span> '
 
     # Display using Streamlit
     st.markdown(html_string, unsafe_allow_html=True)
+
 
 def align_dataframes(b2a, df1, a2b, df2):
     """
@@ -211,7 +214,7 @@ def analyze_heatmap(df_input, estimation):
     # Additional styling
     fig.update_layout(
         title=f"{prepend} Distribution of Importance Scores",
-        title_font={'size': 25},
+        title_font={"size": 25},
         xaxis_title="Importance Value",
         yaxis_title="Frequency",
         showlegend=False,
@@ -238,7 +241,7 @@ def analyze_heatmap(df_input, estimation):
     # Additional styling
     fig.update_layout(
         title=f"{prepend} Importance Score per Token",
-        title_font={'size': 25},
+        title_font={"size": 25},
         xaxis_title="Token",
         yaxis_title="Importance Value",
         showlegend=False,
@@ -270,9 +273,9 @@ def analyze_heatmap(df_input, estimation):
         trendline="lowess",
         title=f"{prepend} Correlation between Importance and Position",
     )
-    fig.update_layout(title_font={'size': 25})
+    fig.update_layout(title_font={"size": 25})
     st.plotly_chart(fig, use_container_width=True)
-    
+
     st.write(f"Correlation between importance & position: {correlation:.2f}")
     st.write(f"P-value: {p_value:.2f}")
 
@@ -338,7 +341,7 @@ def compare_heatmaps(df1, df2):
             title="[ESTIMATION] Importance by Token",
             color_discrete_sequence=["blue"],
         )
-        fig1.update_layout(title_font={'size': 25})
+        fig1.update_layout(title_font={"size": 25})
         st.plotly_chart(fig1)
 
     with col2:
@@ -350,7 +353,7 @@ def compare_heatmaps(df1, df2):
             title="[INTEGRATED GRADIENTS] Importance by Token",
             color_discrete_sequence=["red"],
         )
-        fig2.update_layout(title_font={'size': 25})
+        fig2.update_layout(title_font={"size": 25})
         st.plotly_chart(fig2)
 
     # Display the comparison metrics
@@ -844,7 +847,7 @@ ig = st.toggle(
 if st.button("Submit"):
     logger.debug(f"PROMPT: {user_input}")
     if ig:
-        logger.debug(f"Processing With Integrated Gradients")
+        logger.debug("Processing With Integrated Gradients")
         tab1, tab2 = st.tabs(["Individual Analysis", "Comparative Analysis"])
         df1 = []
         df2 = []
