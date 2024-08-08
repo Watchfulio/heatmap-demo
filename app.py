@@ -485,7 +485,7 @@ async def get_embedding(input_text, model=None, tokenizer=None):
     - ValueError: If 'model' is specified but 'tokenizer' is not.
     """
     if not model:
-        api_key = os.getenv("OPENAI_KEY", "Not found")
+        api_key = os.getenv("OPENAI_API_KEY", "Not found")
         aclient = AsyncOpenAI(api_key=api_key)
 
         resp = await aclient.embeddings.create(input=input_text, model="text-embedding-ada-002")
