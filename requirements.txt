@@ -3,6 +3,7 @@ numpy
 openai
 pandas
 plotly
+python-dotenv
 scikit_learn
 scipy
 seaborn

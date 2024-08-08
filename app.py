@@ -6,9 +6,10 @@ import os
 from collections import Counter
 from math import sqrt
 
+from dotenv import load_dotenv
 import matplotlib
 import numpy as np
-import openai
+from openai import AsyncOpenAI
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -20,11 +21,26 @@ import torch
 from scipy.spatial.distance import euclidean
 from scipy.stats import gaussian_kde, kendalltau, pearsonr
 from sklearn.metrics.pairwise import cosine_similarity
-from tenacity import retry
+from tenacity import (
+    after_log,
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from transformers import GPT2LMHeadModel
 
-openai.api_key = os.getenv("OPENAI_API_KEY", "Not found")
-openai.organization = os.getenv("OPENAI_ORGANIZATION", "Not found")
+load_dotenv()
+
+# Configure root logger to capture only WARN or higher level logs
+logging.basicConfig(
+    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Configure logger to capture INFO-level logs
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 def render_heatmap(importance_scores_df):
@@ -441,7 +457,14 @@ def normalize_vector(v):
     return v / norm
 
 
-@retry
+@retry(
+    reraise=True,
+    before_sleep=before_sleep_log(logger, logging.INFO),
+    after=after_log(logger, logging.INFO),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception_type(ZeroDivisionError),
+    stop=stop_after_attempt(4),
+)
 async def get_embedding(input_text, model=None, tokenizer=None):
     """
     Asynchronously get the text embedding for a given input text.
@@ -461,12 +484,14 @@ async def get_embedding(input_text, model=None, tokenizer=None):
     Raises:
     - ValueError: If 'model' is specified but 'tokenizer' is not.
     """
-
     if not model:
-        resp = await openai.Embedding.acreate(
-            input=input_text, model="text-embedding-ada-002"
-        )
-        return np.array(resp["data"][0]["embedding"])
+        api_key = os.getenv("OPENAI_KEY", "Not found")
+        aclient = AsyncOpenAI(api_key=api_key)
+
+        resp = await aclient.embeddings.create(input=input_text, model="text-embedding-ada-002")
+        embedding_data = resp.to_dict()
+
+        return np.array(embedding_data["data"][0]["embedding"])
     else:
         if not tokenizer:
             raise ValueError(
@@ -792,15 +817,6 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
 #
 # MAIN EXECUTION
 #
-
-# Configure root logger to capture only WARN or higher level logs
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-
-# Configure logger to capture INFO-level logs
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 st.set_page_config(layout="wide", page_title="Token Heatmap", page_icon=":fire:")
 
