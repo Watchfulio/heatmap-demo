@@ -10,11 +10,11 @@ You can find a live version of the demo [here](https://heatmap.demos.watchful.io
 
 ---
 
-## Quickstart 
+## Quickstart
 
 ```bash
 pip install -r requirements.txt
-OPENAI_API_KEY=<KEY> OPENAI_ORGANIZATION=<ORG> streamlit run streamlit_app.py
+OPENAI_KEY=<KEY> streamlit run app.py
 ```
 
 For more information, refer to the [blog post](https://watchful.io)
