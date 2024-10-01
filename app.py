@@ -11,6 +11,7 @@ import matplotlib
 import numpy as np
 from openai import AsyncOpenAI
 import pandas as pd
+from PIL import Image
 import plotly.express as px
 import plotly.graph_objects as go
 import scipy
@@ -41,6 +42,11 @@ logging.basicConfig(
 # Configure logger to capture INFO-level logs
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+favicon = Image.open("images/favicon.ico")
+
+st.set_page_config(layout="wide", page_title="Token Heatmap", page_icon=favicon)
+st.logo("images/thoughworks_logo.png")
 
 
 def render_heatmap(importance_scores_df):
@@ -817,10 +823,6 @@ def process_integrated_gradients(input_text, gpt2tokenizer, model, n_steps=100):
 #
 # MAIN EXECUTION
 #
-
-st.set_page_config(layout="wide", page_title="Token Heatmap", page_icon=":fire:")
-
-
 @st.cache_resource
 def load_model(model_version):
     return GPT2LMHeadModel.from_pretrained(model_version, output_attentions=True)
