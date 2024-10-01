@@ -46,7 +46,7 @@ logger.setLevel(logging.DEBUG)
 favicon = Image.open("images/favicon.ico")
 
 st.set_page_config(layout="wide", page_title="Token Heatmap", page_icon=favicon)
-st.logo("images/thoughworks-logo.svg")
+st.logo("images/thoughtworks-logo.svg")
 
 
 def render_heatmap(importance_scores_df):
